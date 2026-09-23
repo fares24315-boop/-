@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>لوحة إدارة الصيدلية</title>
+    <style>
+      :root {
+        --bg: #f3f7fb;
+        --panel: #ffffff;
+        --primary: #0f766e;
+        --primary-dark: #115e59;
+        --line: #e5e7eb;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --danger: #ef4444;
+        --success: #16a34a;
+        --warning: #f59e0b;
+        --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      }
+      * { box-sizing: border-box; }
+      html { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #eefbf8, #eef6ff, #f8fafc);
+        color: var(--text);
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+      }
+      body.dark {
+        --panel: #172033;
+        --text: #e5eef5;
+        --muted: #9fb0bf;
+        --line: #2b3a4d;
+        --shadow: 0 16px 34px rgba(0,0,0,.24);
+        background: linear-gradient(135deg, #0f172a, #102b35, #111827);
+      }
+      body.dark .card, body.dark .stat-card, body.dark .list-item, body.dark .auth-box { background: var(--panel); }
+      body.dark input, body.dark select { background: #111827; color: var(--text); border-color: var(--line); }
+      body.dark th { background: rgba(45,212,191,.12); }
+      .app {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 22px;
+      }
+      .auth-screen {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: linear-gradient(135deg, #0f766e, #0b3d5a);
+      }
+      .auth-box {
+        width: min(420px, 100%);
+        background: #fff;
+        border-radius: 20px;
+        padding: 28px;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.18);
+      }
+      .auth-box h1 { margin: 0 0 10px; text-align: center; }
+      .auth-box p { color: var(--muted); text-align: center; margin: 0 0 22px; }
+      .auth-box label { display: block; color: var(--muted); margin-bottom: 7px; }
+      .auth-box input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+        font: inherit;
+      }
+      .auth-box button {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--primary);
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .auth-error { color: var(--danger); min-height: 22px; text-align: center; margin-top: 12px; }
+      .hidden { display: none !important; }
+      .toast {
+        position: fixed;
+        top: 22px;
+        right: 22px;
+        z-index: 20;
+        min-width: 260px;
+        max-width: min(420px, calc(100vw - 44px));
+        padding: 14px 18px;
+        border: 1px solid rgba(15,118,110,.18);
+        border-right: 4px solid var(--primary);
+        border-radius: 14px;
+        background: rgba(255,255,255,.97);
+        box-shadow: 0 18px 44px rgba(15,23,42,.18);
+        transform: translateY(-20px);
+        opacity: 0;
+        pointer-events: none;
+        transition: .25s ease;
+      }
+      .toast.show { transform: translateY(0); opacity: 1; }
+      .toast.error { border-right-color: var(--danger); }
+      .topbar {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        border-radius: 18px;
+        padding: 18px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: var(--shadow);
+        margin-bottom: 22px;
+      }
+      .topbar h1 { margin: 0; font-size: 1.6rem; }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .stat-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px 20px;
+        box-shadow: var(--shadow);
+      }
+      .stat-label {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-bottom: 8px;
+      }
+      .stat-value {
+        font-size: 1.8rem;
+        font-weight: 800;
+      }
+      .layout-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px 20px;
+        box-shadow: var(--shadow);
+      }
+      .section-title {
+        margin: 0 0 14px;
+        font-size: 1.2rem;
+      }
+      .list-stack {
+        display: grid;
+        gap: 12px;
+      }
+      .list-item {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      .muted { color: var(--muted); }
+      .pill {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 800;
+      }
+      .cash { background: #dcfce7; color: #166534; }
+      .credit { background: #fef3c7; color: #92400e; }
+      .empty {
+        text-align: center;
+        padding: 18px;
+        color: var(--muted);
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+        gap: 12px;
+      }
+      .field { display: flex; flex-direction: column; gap: 7px; }
+      .field label { color: var(--muted); font-size: 0.85rem; }
+      .field input, .field select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 11px 12px;
+        background: #fff;
+        color: var(--text);
+        font: inherit;
+      }
+      .full { grid-column: 1 / -1; }
+      .action-btn {
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        background: var(--primary);
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .permission-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .permission-list label { color: var(--text); font-size: 0.85rem; }
+      .danger-text { color: var(--danger); }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 620px;
+      }
+      .card { overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+      button, select, input { min-height: 44px; }
+      th, td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 8px;
+        text-align: center;
+      }
+      th { background: rgba(15,118,110,0.06); }
+      @media (max-width: 900px) {
+        .layout-grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toast" class="toast" role="status"></div>
+    <section id="adminLogin" class="auth-screen">
+      <form id="adminLoginForm" class="auth-box">
+        <h1>دخول الإدارة</h1>
+        <p>هذه الصفحة مخصصة لمدير النظام فقط</p>
+        <label for="adminUsername">اسم مدير الإدارة</label>
+        <input id="adminUsername" type="text" autocomplete="username" required />
+        <label for="adminPassword">كلمة مرور الإدارة</label>
+        <input id="adminPassword" type="password" autocomplete="current-password" required />
+        <button type="submit">دخول لوحة الإدارة</button>
+        <div id="adminLoginError" class="auth-error"></div>
+      </form>
+    </section>
+
+    <div id="adminApp" class="app hidden">
+      <header class="topbar">
+        <h1>لوحة الإدارة</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="themeToggleBtn" class="btn" style="padding:10px 16px;border-radius:12px;background:#dbeafe;color:#0f172a;font-weight:700;border:none;cursor:pointer;">الوضع الداكن</button>
+          <button id="refreshBtn" class="btn" style="padding:10px 16px;border-radius:12px;background:#fff;color:#0f172a;font-weight:700;border:none;cursor:pointer;">تحديث</button>
+          <button id="clearDataBtn" class="btn" style="padding:10px 16px;border-radius:12px;background:#fee2e2;color:#991b1b;font-weight:700;border:none;cursor:pointer;">تفريغ كل البيانات</button>
+        </div>
+      </header>
+
+      <section class="summary-grid">
+        <div class="stat-card">
+          <div class="stat-label">إجمالي المبيعات</div>
+          <div class="stat-value" id="salesTotal">0.00 ر.س</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">إجمالي المشتريات</div>
+          <div class="stat-value" id="purchasesTotal">0.00 ر.س</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">صافي الربح</div>
+          <div class="stat-value" id="profitTotal">0.00 ر.س</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">عدد الأصناف</div>
+          <div class="stat-value" id="productCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">رصيد الخزينة</div>
+          <div class="stat-value" id="treasuryBalance">0.00 ر.س</div>
+        </div>
+      </section>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">خزينة نقطة البيع</h2>
+          <form id="treasuryForm">
+            <div class="form-grid">
+              <div class="field"><label for="treasuryAction">نوع الحركة</label><select id="treasuryAction"><option value="دائن">إيداع</option><option value="مدين">سحب</option></select></div>
+              <div class="field"><label for="treasuryAmount">المبلغ</label><input id="treasuryAmount" type="number" min="0.01" step="0.01" required /></div>
+              <div class="field full"><label for="treasuryNote">البيان</label><input id="treasuryNote" type="text" placeholder="سبب الإيداع أو السحب" /></div>
+            </div>
+            <button class="action-btn" style="margin-top:14px;" type="submit">حفظ حركة الخزينة</button>
+          </form>
+        </div>
+        <div class="card"><h2 class="section-title">آخر حركات الخزينة</h2><div class="list-stack" id="treasuryList"></div></div>
+      </section>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">تسجيل مصروف من الإدارة</h2>
+          <form id="expenseForm">
+            <div class="form-grid">
+              <div class="field"><label for="expenseCategory">نوع المصروف</label><select id="expenseCategory"><option>إيجار</option><option>رواتب</option><option>كهرباء ومياه</option><option>نقل</option><option>مستلزمات</option><option>أخرى</option></select></div>
+              <div class="field"><label for="expenseAmount">المبلغ</label><input id="expenseAmount" type="number" min="0.01" step="0.01" required /></div>
+              <div class="field"><label for="expenseDate">التاريخ</label><input id="expenseDate" type="date" required /></div>
+              <div class="field"><label for="expenseNote">البيان</label><input id="expenseNote" type="text" placeholder="وصف المصروف" /></div>
+            </div>
+            <button class="action-btn" style="margin-top:14px;" type="submit">حفظ المصروف</button>
+          </form>
+        </div>
+        <div class="card"><h2 class="section-title">سجل المصروفات</h2><div class="list-stack" id="expensesList"></div></div>
+      </section>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">أحدث المبيعات</h2>
+          <div class="list-stack" id="salesList"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">أحدث المشتريات</h2>
+          <div class="list-stack" id="purchasesList"></div>
+        </div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">تغيير كلمة مرور مستخدم</h2>
+          <form id="userPasswordForm">
+            <div class="field">
+              <label for="passwordUserSelect">المستخدم</label>
+              <select id="passwordUserSelect" required></select>
+            </div>
+            <div class="field" style="margin-top:12px;"><label for="adminNewUserPassword">كلمة المرور الجديدة</label><input id="adminNewUserPassword" type="password" minlength="4" required /></div>
+            <div class="field" style="margin-top:12px;"><label for="adminConfirmUserPassword">تأكيد كلمة المرور</label><input id="adminConfirmUserPassword" type="password" minlength="4" required /></div>
+            <button class="action-btn" style="margin-top:14px;" type="submit">حفظ كلمة المرور</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2 class="section-title">تغيير كلمة مرور الإدارة</h2>
+          <form id="adminPasswordForm">
+            <div class="field"><label for="currentAdminPassword">كلمة المرور الحالية</label><input id="currentAdminPassword" type="password" required /></div>
+            <div class="field" style="margin-top:12px;"><label for="newAdminPassword">كلمة المرور الجديدة</label><input id="newAdminPassword" type="password" minlength="4" required /></div>
+            <div class="field" style="margin-top:12px;"><label for="confirmAdminPassword">تأكيد كلمة المرور</label><input id="confirmAdminPassword" type="password" minlength="4" required /></div>
+            <button class="action-btn" style="margin-top:14px;" type="submit">تحديث كلمة مرور الإدارة</button>
+          </form>
+        </div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">مخزون الصيدلية</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الصنف</th>
+                <th>الكمية</th>
+                <th>السعر</th>
+                <th>تاريخ الصلاحية</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTable"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2 class="section-title">حسابات الموردين</h2>
+          <div class="list-stack" id="suppliersList"></div>
+        </div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">إضافة مستخدم وتحديد الصلاحيات</h2>
+          <form id="userForm">
+            <div class="form-grid">
+              <div class="field">
+                <label for="newUsername">اسم المستخدم</label>
+                <input id="newUsername" type="text" required />
+              </div>
+              <div class="field">
+                <label for="newPassword">كلمة المرور</label>
+                <input id="newPassword" type="password" required />
+              </div>
+              <div class="field full">
+                <label>الصلاحيات</label>
+                <div class="permission-list">
+                  <label><input type="checkbox" value="dashboard" checked /> لوحة التحكم</label>
+                  <label><input type="checkbox" value="sales" checked /> المبيعات</label>
+                  <label><input type="checkbox" value="purchases" /> المشتريات</label>
+                  <label><input type="checkbox" value="products" /> الأصناف</label>
+                  <label><input type="checkbox" value="suppliers" /> الموردين</label>
+                  <label><input type="checkbox" value="reports" /> التقارير</label>
+                  <label><input type="checkbox" value="expenses" /> المصروفات</label>
+                </div>
+              </div>
+            </div>
+            <button class="action-btn" style="margin-top:14px;" type="submit">حفظ المستخدم</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2 class="section-title">المستخدمون والصلاحيات</h2>
+          <div class="list-stack" id="usersList"></div>
+        </div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">سداد حساب مورد</h2>
+          <form id="paymentForm">
+            <div class="form-grid">
+              <div class="field">
+                <label for="paymentSupplier">المورد</label>
+                <select id="paymentSupplier" required></select>
+              </div>
+              <div class="field">
+                <label for="paymentAmount">قيمة السداد</label>
+                <input id="paymentAmount" type="number" min="0.01" step="0.01" required />
+              </div>
+              <div class="field full">
+                <label for="paymentDate">تاريخ السداد</label>
+                <input id="paymentDate" type="date" required />
+              </div>
+            </div>
+            <button class="action-btn" style="margin-top:14px;" type="submit">تسجيل السداد</button>
+          </form>
+          <div class="list-stack" id="paymentsList" style="margin-top:16px;"></div>
+        </div>
+        <div class="card">
+          <h2 class="section-title">الأرباح والخسائر</h2>
+          <div class="list-stack">
+            <div class="list-item"><div class="muted">إجمالي المبيعات</div><strong id="profitSales">0.00 ر.س</strong></div>
+            <div class="list-item"><div class="muted">إجمالي تكلفة المشتريات</div><strong id="profitPurchases">0.00 ر.س</strong></div>
+            <div class="list-item"><div class="muted">إجمالي المصروفات</div><strong id="profitExpenses">0.00 ر.س</strong></div>
+            <div class="list-item"><div class="muted">صافي الربح / الخسارة</div><strong id="profitNet">0.00 ر.س</strong></div>
+            <div class="list-item"><div class="muted">نسبة الربح أو الخسارة من المبيعات</div><strong id="profitMargin">0.00%</strong></div>
+            <div class="list-item"><div class="muted">النقد المدفوع للموردين</div><strong id="supplierPaymentsTotal">0.00 ر.س</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="layout-grid">
+        <div class="card">
+          <h2 class="section-title">سجل العمليات والرقابة</h2>
+          <div class="list-stack" id="auditList"></div>
+        </div>
+        <div class="card">
+          <h2 class="section-title">الشفتات المقفولة</h2>
+          <div class="list-stack" id="shiftsList"></div>
+        </div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="card">
+        <h2 class="section-title">تصدير بيانات النظام إلى Excel</h2>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="action-btn" data-export="sales">تصدير المبيعات</button>
+          <button class="action-btn" data-export="purchases">تصدير المشتريات</button>
+          <button class="action-btn" data-export="products">تصدير المخزون</button>
+          <button class="action-btn" data-export="suppliers">تصدير الموردين</button>
+          <button class="action-btn" data-export="supplierPayments">تصدير سجل سداد الموردين</button>
+          <button class="action-btn" data-export="expenses">تصدير المصروفات</button>
+          <button class="action-btn" data-export="auditLog">تصدير سجل العمليات</button>
+          <button class="action-btn" data-export="shifts">تصدير الشفتات</button>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const STORAGE_KEY = 'pharmacy_app_v1';
+      const ADMIN_SESSION_KEY = 'pharmacy_admin_session';
+      const ADMIN_USERNAME = 'superadmin';
+      let ADMIN_PASSWORD = localStorage.getItem('pharmacy_admin_password') || 'Pharmacy@2026';
+
+      function readState() {
+        try {
+          const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+          if (!Array.isArray(state.users) || !state.users.length) {
+            state.users = [{ username: 'admin', password: '1234', permissions: ['dashboard', 'sales', 'purchases', 'products', 'suppliers', 'reports', 'expenses'] }];
+          }
+          const defaultAdmin = state.users.find(user => user.username === 'admin');
+          if (defaultAdmin) {
+            defaultAdmin.permissions = defaultAdmin.permissions || ['dashboard', 'sales', 'purchases', 'products', 'suppliers', 'reports'];
+            if (!defaultAdmin.permissions.includes('expenses')) defaultAdmin.permissions.push('expenses');
+          }
+          return state;
+        } catch {
+          return { users: [{ username: 'admin', password: '1234', permissions: ['dashboard', 'sales', 'purchases', 'products', 'suppliers', 'reports', 'expenses'] }] };
+        }
+      }
+
+      function formatCurrency(value) {
+        return `${Number(value || 0).toFixed(2)} ر.س`;
+      }
+
+      let toastTimer;
+      function showToast(message, type = 'success') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast show ${type === 'error' ? 'error' : ''}`;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 3600);
+      }
+
+      function toggleTheme() {
+        document.body.classList.toggle('dark');
+        const dark = document.body.classList.contains('dark');
+        localStorage.setItem('pharmacy_dark_mode', dark ? '1' : '0');
+        document.getElementById('themeToggleBtn').textContent = dark ? 'الوضع الفاتح' : 'الوضع الداكن';
+      }
+
+      function applyTheme() {
+        const dark = localStorage.getItem('pharmacy_dark_mode') === '1';
+        document.body.classList.toggle('dark', dark);
+        document.getElementById('themeToggleBtn').textContent = dark ? 'الوضع الفاتح' : 'الوضع الداكن';
+      }
+
+      function today() {
+        return new Date().toISOString().split('T')[0];
+      }
+
+      function saveState(state) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        renderAdmin();
+      }
+
+      function addAdminAudit(state, action, details) {
+        state.auditLog = Array.isArray(state.auditLog) ? state.auditLog : [];
+        state.auditLog.push({
+          id: Date.now(),
+          action,
+          details,
+          username: ADMIN_USERNAME,
+          date: new Date().toISOString()
+        });
+      }
+
+      function addTreasuryTransaction(state, type, amount, details) {
+        state.treasury = state.treasury || { balance: 0, transactions: [] };
+        state.treasury.transactions = Array.isArray(state.treasury.transactions) ? state.treasury.transactions : [];
+        const value = Number(amount || 0);
+        state.treasury.balance = Number(state.treasury.balance || 0) + (type === 'دائن' ? value : -value);
+        state.treasury.transactions.push({ id: Date.now(), type, amount: value, details, username: ADMIN_USERNAME, date: new Date().toISOString() });
+      }
+
+      function renderAdmin() {
+        const state = readState();
+        const sales = Array.isArray(state.sales) ? state.sales : [];
+        const purchases = Array.isArray(state.purchases) ? state.purchases : [];
+        const expenses = Array.isArray(state.expenses) ? state.expenses : [];
+        const products = Array.isArray(state.products) ? state.products : [];
+        const suppliers = Array.isArray(state.suppliers) ? state.suppliers : [];
+        const users = Array.isArray(state.users) ? state.users : [];
+        const payments = Array.isArray(state.supplierPayments) ? state.supplierPayments : [];
+        const treasury = state.treasury || { balance: 0, transactions: [] };
+        const treasuryTransactions = Array.isArray(treasury.transactions) ? treasury.transactions : [];
+
+        const salesTotal = sales.reduce((sum, s) => sum + Number(s.total || 0), 0);
+        const purchasesTotal = purchases.reduce((sum, p) => sum + Number(p.total || 0), 0);
+        const expensesTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+        const profit = salesTotal - purchasesTotal - expensesTotal;
+        const profitMargin = salesTotal ? (profit / salesTotal) * 100 : 0;
+        const paymentsTotal = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+        document.getElementById('salesTotal').textContent = formatCurrency(salesTotal);
+        document.getElementById('purchasesTotal').textContent = formatCurrency(purchasesTotal);
+        document.getElementById('profitTotal').textContent = formatCurrency(profit);
+        document.getElementById('productCount').textContent = products.length;
+        document.getElementById('treasuryBalance').textContent = formatCurrency(treasury.balance);
+        document.getElementById('profitSales').textContent = formatCurrency(salesTotal);
+        document.getElementById('profitPurchases').textContent = formatCurrency(purchasesTotal);
+        document.getElementById('profitExpenses').textContent = formatCurrency(expensesTotal);
+        document.getElementById('profitNet').textContent = formatCurrency(profit);
+        document.getElementById('profitNet').className = profit >= 0 ? '' : 'danger-text';
+        document.getElementById('profitMargin').textContent = `${profitMargin.toFixed(2)}%`;
+        document.getElementById('profitMargin').className = profit >= 0 ? '' : 'danger-text';
+        document.getElementById('supplierPaymentsTotal').textContent = formatCurrency(paymentsTotal);
+
+        const salesList = document.getElementById('salesList');
+        salesList.innerHTML = sales.length
+          ? sales.slice().reverse().slice(0, 6).map(s => `
+              <div class="list-item">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                  <strong>فاتورة #${s.id}</strong>
+                  <span class="pill ${s.paymentType === 'آجل' ? 'credit' : 'cash'}">${s.paymentType}</span>
+                </div>
+                <div class="muted">العميل: ${s.customer}</div>
+                <div class="muted">الصيدلي: ${s.cashier}</div>
+                <div class="muted">حفظ بواسطة: ${s.savedBy || s.cashier || 'غير محدد'}</div>
+                <div class="muted">الإجمالي: ${formatCurrency(s.total)}</div>
+              </div>
+            `).join('')
+          : '<div class="empty">لا توجد مبيعات بعد</div>';
+
+        const purchasesList = document.getElementById('purchasesList');
+        purchasesList.innerHTML = purchases.length
+          ? purchases.slice().reverse().slice(0, 6).map(p => `
+              <div class="list-item">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                  <strong>شراء #${p.id}</strong>
+                  <span class="pill ${p.type === 'آجل' ? 'credit' : 'cash'}">${p.type}</span>
+                </div>
+                <div class="muted">المورد: ${p.supplierName}</div>
+                <div class="muted">رقم الفاتورة: ${p.invoiceNo}</div>
+                <div class="muted">حفظ بواسطة: ${p.savedBy || 'غير محدد'}</div>
+                <div class="muted">الإجمالي: ${formatCurrency(p.total)}</div>
+              </div>
+            `).join('')
+          : '<div class="empty">لا توجد مشتريات بعد</div>';
+
+        const inventoryTable = document.getElementById('inventoryTable');
+        inventoryTable.innerHTML = products.length
+          ? products.map(p => `
+              <tr>
+                <td>${p.name}</td>
+                <td>${p.qty}</td>
+                <td>${formatCurrency(p.price)}</td>
+                <td>${p.expiry || 'غير محدد'}</td>
+              </tr>
+            `).join('')
+          : '<tr><td colspan="4" class="empty">لا توجد أصناف</td></tr>';
+
+        const suppliersList = document.getElementById('suppliersList');
+        suppliersList.innerHTML = suppliers.length
+          ? suppliers.map(s => `
+              <div class="list-item">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                  <strong>${s.name}</strong>
+                  <span class="pill ${Number(s.balance || 0) >= 0 ? 'cash' : 'credit'}">${Number(s.balance || 0) >= 0 ? 'مستحق' : 'مدفوع'}</span>
+                </div>
+                <div class="muted">الكود: ${s.code}</div>
+                <div class="muted">الهاتف: ${s.phone || 'غير متوفر'}</div>
+                <div class="muted">آخر حفظ بواسطة: ${s.savedBy || 'غير محدد'}</div>
+                <div style="margin-top:8px;font-weight:700;color:${Number(s.balance || 0) >= 0 ? '#166534' : '#b91c1c'};">الرصيد: ${formatCurrency(s.balance)}</div>
+                ${Number(s.balance || 0) > 0 ? '<div class="muted" style="margin-top:10px;color:#b45309;">لا يمكن حذف مورد عليه مستحقات</div>' : `<button class="action-btn delete-supplier-btn" data-supplier-id="${s.id}" style="margin-top:10px;background:#fee2e2;color:#991b1b;">حذف المورد</button>`}
+              </div>
+            `).join('')
+          : '<div class="empty">لا يوجد موردين</div>';
+
+        document.getElementById('usersList').innerHTML = users.length
+          ? users.map(user => `
+              <div class="list-item">
+                <strong>${user.username}</strong>
+                <div class="muted">الصلاحيات: ${(user.permissions || []).join('، ') || 'بدون صلاحيات'}</div>
+              </div>
+            `).join('')
+          : '<div class="empty">لا يوجد مستخدمون</div>';
+        document.getElementById('passwordUserSelect').innerHTML = users.map(user => `<option value="${user.username}">${user.username}</option>`).join('');
+
+        const supplierSelect = document.getElementById('paymentSupplier');
+        supplierSelect.innerHTML = suppliers.map(s => `<option value="${s.id}">${s.name} - الرصيد ${formatCurrency(s.balance)}</option>`).join('');
+
+        document.getElementById('paymentsList').innerHTML = payments.length
+          ? payments.slice().reverse().slice(0, 8).map(payment => `
+              <div class="list-item">
+                <strong>${payment.supplierName}</strong>
+                <div class="muted">سداد ${formatCurrency(payment.amount)} بتاريخ ${payment.date}</div>
+                <div class="muted">بواسطة: ${payment.username || ADMIN_USERNAME}</div>
+                <div class="muted">الرصيد بعد السداد: ${formatCurrency(payment.balanceAfter)}</div>
+              </div>
+            `).join('')
+          : '<div class="empty">لا توجد عمليات سداد</div>';
+
+        document.getElementById('treasuryList').innerHTML = treasuryTransactions.length
+          ? treasuryTransactions.slice().reverse().slice(0, 12).map(transaction => `
+              <div class="list-item"><strong>${transaction.type === 'دائن' ? 'إيداع' : 'سحب'}</strong><div class="muted">${formatCurrency(transaction.amount)} | ${transaction.details}</div><div class="muted">بواسطة: ${transaction.username || 'النظام'} | ${new Date(transaction.date).toLocaleString('ar-EG')}</div></div>
+            `).join('')
+          : '<div class="empty">لا توجد حركات خزينة</div>';
+
+        document.getElementById('expensesList').innerHTML = expenses.length
+          ? expenses.slice().reverse().slice(0, 12).map(expense => `
+              <div class="list-item"><strong>${expense.category}</strong><div class="muted">${formatCurrency(expense.amount)} | ${expense.note || 'بدون بيان'}</div><div class="muted">بتاريخ: ${expense.date} | بواسطة: ${expense.username || ADMIN_USERNAME}</div></div>
+            `).join('')
+          : '<div class="empty">لا توجد مصروفات مسجلة</div>';
+
+        document.querySelectorAll('.delete-supplier-btn').forEach(button => {
+          button.addEventListener('click', () => deleteSupplier(Number(button.dataset.supplierId)));
+        });
+
+        const auditLog = Array.isArray(state.auditLog) ? state.auditLog : [];
+        document.getElementById('auditList').innerHTML = auditLog.length
+          ? auditLog.slice().reverse().slice(0, 20).map(log => `
+              <div class="list-item">
+                <strong>${log.action}</strong>
+                <div class="muted">${log.details}</div>
+                <div class="muted">المستخدم: ${log.username} | ${new Date(log.date).toLocaleString('ar-EG')}</div>
+              </div>
+            `).join('')
+          : '<div class="empty">لا توجد عمليات مسجلة</div>';
+
+        const shifts = Array.isArray(state.shifts) ? state.shifts : [];
+        document.getElementById('shiftsList').innerHTML = shifts.length
+          ? shifts.slice().reverse().map(shift => `
+              <div class="list-item">
+                <strong>شفت #${shift.id}</strong>
+                <div class="muted">المستخدم: ${shift.username}</div>
+                <div class="muted">المبيعات: ${formatCurrency(shift.salesTotal)} | المشتريات: ${formatCurrency(shift.purchasesTotal)}</div>
+                <div class="muted">المتوقع في الدرج: ${formatCurrency(shift.expectedCash)} | الفعلي: ${formatCurrency(shift.actualCash)}</div>
+                <div class="muted">${shift.variance >= 0 ? 'زيادة' : 'عجز'}: ${formatCurrency(Math.abs(shift.variance || 0))} | الصافي: ${formatCurrency(shift.net)}</div>
+                <div class="muted">${new Date(shift.closedAt).toLocaleString('ar-EG')}</div>
+              </div>
+            `).join('')
+          : '<div class="empty">لا توجد شفتات مقفولة</div>';
+      }
+
+      function deleteSupplier(supplierId) {
+        const state = readState();
+        const supplier = (state.suppliers || []).find(item => item.id === supplierId);
+        if (!supplier) return;
+        if (Number(supplier.balance || 0) > 0) {
+          showToast('لا يمكن حذف المورد قبل سداد كل مستحقاته', 'error');
+          return;
+        }
+        const password = prompt('أدخل كلمة مرور مدير الإدارة لتأكيد حذف المورد');
+        if (password !== ADMIN_PASSWORD) {
+          showToast('كلمة مرور الإدارة غير صحيحة', 'error');
+          return;
+        }
+        if (!confirm(`سيتم حذف المورد ${supplier.name} من القائمة. هل تريد المتابعة؟`)) return;
+        state.suppliers = state.suppliers.filter(item => item.id !== supplierId);
+        addAdminAudit(state, 'حذف مورد', `تم حذف المورد: ${supplier.name}`);
+        saveState(state);
+        showToast('تم حذف المورد من لوحة الإدارة');
+      }
+
+      function exportExcel(type) {
+        const state = readState();
+        const data = Array.isArray(state[type]) ? state[type] : [];
+        if (!data.length) {
+          showToast('لا توجد بيانات لتصديرها', 'error');
+          return;
+        }
+        const labels = {
+          sales: 'المبيعات', purchases: 'المشتريات', products: 'المخزون', suppliers: 'الموردين', supplierPayments: 'سجل سداد الموردين', auditLog: 'سجل العمليات', shifts: 'الشفتات',
+          id: 'الرقم', username: 'المستخدم', action: 'العملية', details: 'التفاصيل', date: 'التاريخ', balanceAfter: 'الرصيد بعد السداد',
+          closedAt: 'وقت التقفيل', name: 'اسم الصنف', type: 'النوع', qty: 'الكمية', price: 'سعر البيع',
+          cost: 'سعر الشراء', expiry: 'الصلاحية', barcode: 'الباركود', supplier: 'المورد', supplierName: 'اسم المورد',
+          supplierCode: 'كود المورد', code: 'الكود', phone: 'الهاتف', balance: 'الرصيد', customer: 'العميل',
+          cashier: 'الصيدلي', paymentType: 'نوع الدفع', invoiceNo: 'رقم الفاتورة', total: 'الإجمالي',
+          subtotal: 'قبل الخصم والضريبة', discount: 'الخصم', tax: 'الضريبة', salesTotal: 'إجمالي المبيعات',
+          purchasesTotal: 'إجمالي المشتريات', net: 'الصافي', salesCount: 'عدد المبيعات', amount: 'المبلغ',
+          permissions: 'الصلاحيات', items: 'الأصناف'
+        };
+        const keys = [...new Set(data.flatMap(item => Object.keys(item)))];
+        const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+        const formatCell = value => typeof value === 'object' ? JSON.stringify(value) : value ?? '';
+        const title = `تقرير ${labels[type] || type}`;
+        const header = keys.map(key => `<th>${escapeHtml(labels[key] || key)}</th>`).join('');
+        const rows = data.map(item => `<tr>${keys.map(key => `<td>${escapeHtml(formatCell(item[key]))}</td>`).join('')}</tr>`).join('');
+        const workbook = `
+          <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40" dir="rtl">
+            <head><meta charset="UTF-8"><meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
+              <style>
+                body{font-family:Tahoma,Arial;color:#172033;direction:rtl}h1{color:#0f766e;font-size:20px;margin-bottom:16px}p{color:#64748b}
+                table{border-collapse:collapse;width:100%;direction:rtl}th{background:#0f766e;color:#fff;font-weight:bold;border:1px solid #0b5d57;padding:10px;text-align:center;white-space:nowrap}
+                td{border:1px solid #cbd5e1;padding:8px;text-align:center;vertical-align:top;mso-number-format:"@"}tr:nth-child(even){background:#f0fdfa}
+              </style>
+            </head><body><h1>${escapeHtml(title)}</h1><p>تاريخ التصدير: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p><table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table></body>
+          </html>`;
+        const blob = new Blob(['\ufeff', workbook], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `pharmacy-${type}-${new Date().toISOString().slice(0, 10)}.xls`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function showAdminApp() {
+        document.getElementById('adminLogin').classList.add('hidden');
+        document.getElementById('adminApp').classList.remove('hidden');
+        renderAdmin();
+      }
+
+      function clearAllData() {
+        const password = prompt('أدخل كلمة مرور مدير الإدارة لتأكيد التفريغ النهائي');
+        if (password !== ADMIN_PASSWORD) {
+          showToast('بيانات مدير الإدارة غير صحيحة', 'error');
+          return;
+        }
+        if (!confirm('سيتم حذف كل المبيعات والمشتريات والأصناف والموردين والمستخدمين نهائيًا. هل تريد المتابعة؟')) return;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          cleared: true,
+          users: [{ username: 'admin', password: '1234', permissions: ['dashboard', 'sales', 'purchases', 'products', 'suppliers', 'reports', 'expenses'] }],
+          products: [],
+          suppliers: [],
+          sales: [],
+          purchases: [],
+          supplierPayments: [],
+          auditLog: [],
+          shifts: [],
+          nextProductId: 1,
+          nextSaleId: 1,
+          nextPurchaseId: 1,
+          nextSupplierId: 1
+        }));
+        renderAdmin();
+        showToast('تم تفريغ بيانات الموقعين نهائيًا');
+      }
+
+      document.getElementById('adminLoginForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const username = document.getElementById('adminUsername').value.trim();
+        const password = document.getElementById('adminPassword').value;
+        if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+          document.getElementById('adminLoginError').textContent = 'بيانات مدير الإدارة غير صحيحة';
+          return;
+        }
+        sessionStorage.setItem(ADMIN_SESSION_KEY, 'authenticated');
+        showAdminApp();
+      });
+
+      document.getElementById('refreshBtn').addEventListener('click', renderAdmin);
+      applyTheme();
+      document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+      document.getElementById('clearDataBtn').addEventListener('click', clearAllData);
+      window.addEventListener('storage', renderAdmin);
+      document.querySelectorAll('[data-export]').forEach(button => {
+        button.addEventListener('click', () => exportExcel(button.dataset.export));
+      });
+      document.getElementById('paymentDate').value = today();
+
+      document.getElementById('userPasswordForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const state = readState();
+        const username = document.getElementById('passwordUserSelect').value;
+        const newPassword = document.getElementById('adminNewUserPassword').value;
+        const confirmation = document.getElementById('adminConfirmUserPassword').value;
+        const user = (state.users || []).find(item => item.username === username);
+        if (!user || newPassword.length < 4 || newPassword !== confirmation) {
+          showToast('تأكد من المستخدم وتطابق كلمة المرور الجديدة', 'error');
+          return;
+        }
+        user.password = newPassword;
+        addAdminAudit(state, 'تغيير كلمة مرور', `تم تغيير كلمة مرور المستخدم: ${username}`);
+        saveState(state);
+        event.target.reset();
+        showToast('تم تغيير كلمة مرور المستخدم بنجاح');
+      });
+
+      document.getElementById('adminPasswordForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const currentPassword = document.getElementById('currentAdminPassword').value;
+        const newPassword = document.getElementById('newAdminPassword').value;
+        const confirmation = document.getElementById('confirmAdminPassword').value;
+        if (currentPassword !== ADMIN_PASSWORD || newPassword.length < 4 || newPassword !== confirmation) {
+          showToast('تأكد من كلمة المرور الحالية وتطابق الجديدة', 'error');
+          return;
+        }
+        ADMIN_PASSWORD = newPassword;
+        localStorage.setItem('pharmacy_admin_password', ADMIN_PASSWORD);
+        const state = readState();
+        addAdminAudit(state, 'تغيير كلمة مرور الإدارة', 'تم تحديث كلمة مرور مدير الإدارة');
+        saveState(state);
+        event.target.reset();
+        showToast('تم تغيير كلمة مرور الإدارة بنجاح');
+      });
+
+      document.getElementById('userForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const state = readState();
+        state.users = Array.isArray(state.users) ? state.users : [];
+        const username = document.getElementById('newUsername').value.trim();
+        const password = document.getElementById('newPassword').value;
+        const permissions = [...document.querySelectorAll('#userForm input[type="checkbox"]:checked')].map(input => input.value);
+        if (!username || !password || !permissions.length) return;
+        if (state.users.some(user => user.username.toLowerCase() === username.toLowerCase())) {
+          showToast('اسم المستخدم موجود بالفعل', 'error');
+          return;
+        }
+        state.users.push({ username, password, permissions });
+        addAdminAudit(state, 'إضافة مستخدم', `تمت إضافة المستخدم: ${username}`);
+        saveState(state);
+        event.target.reset();
+      });
+
+      document.getElementById('paymentForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const state = readState();
+        state.suppliers = Array.isArray(state.suppliers) ? state.suppliers : [];
+        state.supplierPayments = Array.isArray(state.supplierPayments) ? state.supplierPayments : [];
+        const supplier = state.suppliers.find(item => String(item.id) === document.getElementById('paymentSupplier').value);
+        const amount = Number(document.getElementById('paymentAmount').value || 0);
+        if (!supplier || amount <= 0) return;
+        if (amount > Number(state.treasury?.balance || 0)) {
+          showToast('رصيد الخزينة لا يكفي لسداد هذا المبلغ', 'error');
+          return;
+        }
+        supplier.balance = Math.max(0, Number(supplier.balance || 0) - amount);
+        state.supplierPayments.push({
+          id: Date.now(),
+          supplierId: supplier.id,
+          supplierName: supplier.name,
+          amount,
+          date: document.getElementById('paymentDate').value || today(),
+          username: ADMIN_USERNAME,
+          balanceAfter: supplier.balance
+        });
+        addTreasuryTransaction(state, 'مدين', amount, `سداد المورد: ${supplier.name}`);
+        addAdminAudit(state, 'سداد مورد', `تم سداد ${formatCurrency(amount)} للمورد: ${supplier.name}`);
+        saveState(state);
+        event.target.reset();
+        document.getElementById('paymentDate').value = today();
+        showToast(`تم سداد ${formatCurrency(amount)} وتحديث رصيد ${supplier.name}`);
+      });
+
+      document.getElementById('treasuryForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const state = readState();
+        const amount = Number(document.getElementById('treasuryAmount').value || 0);
+        const type = document.getElementById('treasuryAction').value;
+        if (amount <= 0) {
+          showToast('أدخل مبلغًا صحيحًا للخزينة', 'error');
+          return;
+        }
+        if (type === 'مدين' && amount > Number(state.treasury?.balance || 0)) {
+          showToast('رصيد الخزينة لا يكفي للسحب', 'error');
+          return;
+        }
+        addTreasuryTransaction(state, type, amount, document.getElementById('treasuryNote').value.trim() || 'حركة يدوية');
+        addAdminAudit(state, type === 'دائن' ? 'إيداع خزينة' : 'سحب خزينة', `تم تسجيل ${formatCurrency(amount)} في الخزينة`);
+        saveState(state);
+        event.target.reset();
+        showToast('تم حفظ حركة الخزينة');
+      });
+
+      document.getElementById('expenseDate').value = today();
+      document.getElementById('expenseForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const state = readState();
+        const amount = Number(document.getElementById('expenseAmount').value || 0);
+        if (amount <= 0) {
+          showToast('أدخل قيمة صحيحة للمصروف', 'error');
+          return;
+        }
+        if (amount > Number(state.treasury?.balance || 0)) {
+          showToast('رصيد الخزينة لا يكفي لهذا المصروف', 'error');
+          return;
+        }
+        state.expenses = Array.isArray(state.expenses) ? state.expenses : [];
+        const expense = {
+          id: Date.now(),
+          category: document.getElementById('expenseCategory').value,
+          amount,
+          note: document.getElementById('expenseNote').value.trim(),
+          date: document.getElementById('expenseDate').value || today(),
+          username: ADMIN_USERNAME
+        };
+        state.expenses.push(expense);
+        addTreasuryTransaction(state, 'مدين', amount, `مصروف: ${expense.category}`);
+        addAdminAudit(state, 'مصروف', `تم تسجيل مصروف ${formatCurrency(amount)}`);
+        saveState(state);
+        event.target.reset();
+        document.getElementById('expenseDate').value = today();
+        showToast('تم حفظ المصروف وتحديث الخزينة');
+      });
+
+      if (sessionStorage.getItem(ADMIN_SESSION_KEY) === 'authenticated') showAdminApp();
+    </script>
+  </body>
+</html>
