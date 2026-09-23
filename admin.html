@@ -475,6 +475,10 @@
       </section>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="shared-storage.js"></script>
     <script>
       const STORAGE_KEY = 'pharmacy_app_v1';
       const ADMIN_SESSION_KEY = 'pharmacy_admin_session';
@@ -530,6 +534,9 @@
 
       function saveState(state) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        if (window.pharmacyStorage && typeof window.pharmacyStorage.saveState === 'function') {
+          window.pharmacyStorage.saveState(state).catch(() => {});
+        }
         renderAdmin();
       }
 
@@ -805,6 +812,21 @@
         }));
         renderAdmin();
         showToast('تم تفريغ بيانات الموقعين نهائيًا');
+      }
+
+      if (window.pharmacyStorage) {
+        window.pharmacyStorage.readRemoteState().then(remoteState => {
+          if (remoteState && typeof remoteState === 'object' && Object.keys(remoteState).length) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteState));
+            renderAdmin();
+          }
+        }).catch(() => {});
+
+        window.pharmacyStorage.bindSync(remoteState => {
+          if (!remoteState || typeof remoteState !== 'object') return;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteState));
+          renderAdmin();
+        });
       }
 
       document.getElementById('adminLoginForm').addEventListener('submit', event => {

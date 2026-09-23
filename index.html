@@ -907,6 +907,10 @@
 
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="shared-storage.js"></script>
     <script>
       const STORAGE_KEY = 'pharmacy_app_v1';
 
@@ -936,6 +940,31 @@
       let currentUser = null;
       let editingProductId = null;
       let pendingSecurityAction = null;
+
+      if (window.pharmacyStorage) {
+        window.pharmacyStorage.readRemoteState().then(remoteState => {
+          if (remoteState && typeof remoteState === 'object' && Object.keys(remoteState).length) {
+            state = remoteState;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            renderProducts();
+            renderSuppliers();
+            renderSalesList();
+            renderPurchasesList();
+            renderDashboard();
+          }
+        }).catch(() => {});
+
+        window.pharmacyStorage.bindSync(remoteState => {
+          if (!remoteState || typeof remoteState !== 'object') return;
+          state = remoteState;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          renderProducts();
+          renderSuppliers();
+          renderSalesList();
+          renderPurchasesList();
+          renderDashboard();
+        });
+      }
 
       function loadState() {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -973,6 +1002,9 @@
 
       function saveState() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        if (window.pharmacyStorage && typeof window.pharmacyStorage.saveState === 'function') {
+          window.pharmacyStorage.saveState(state).catch(() => {});
+        }
       }
 
       window.addEventListener('storage', event => {
