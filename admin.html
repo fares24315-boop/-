@@ -229,6 +229,8 @@
         .layout-grid { grid-template-columns: 1fr; }
       }
     </style>
+  
+    <script src="/pharmacy-access.js"></script>
   </head>
   <body>
     <div id="toast" class="toast" role="status"></div>
@@ -387,25 +389,52 @@
                 <input id="newPassword" type="password" required />
               </div>
               <div class="field full">
+                <label for="newUserRole">الدور</label>
+                <select id="newUserRole">
+                  <option value="pharmacist">صيدلي</option>
+                  <option value="cashier">كاشير</option>
+                  <option value="storekeeper">أمين مخزن</option>
+                  <option value="admin">مدير (يدخل صفحة الإدارة)</option>
+                </select>
+              </div>
+              <div class="field full">
                 <label>الصلاحيات</label>
                 <div class="permission-list">
                   <label><input type="checkbox" value="dashboard" checked /> لوحة التحكم</label>
                   <label><input type="checkbox" value="sales" checked /> المبيعات</label>
                   <label><input type="checkbox" value="purchases" /> المشتريات</label>
-                  <label><input type="checkbox" value="products" /> الأصناف</label>
+                  <label><input type="checkbox" value="products" checked /> الأصناف</label>
                   <label><input type="checkbox" value="suppliers" /> الموردين</label>
                   <label><input type="checkbox" value="reports" /> التقارير</label>
                   <label><input type="checkbox" value="expenses" /> المصروفات</label>
+                  <label><input type="checkbox" value="admin" /> صفحة الإدارة</label>
                 </div>
               </div>
             </div>
-            <button class="action-btn" style="margin-top:14px;" type="submit">حفظ المستخدم</button>
+            <button class="action-btn" style="margin-top:14px;" type="submit">حفظ حساب الموظف</button>
           </form>
         </div>
         <div class="card">
-          <h2 class="section-title">المستخدمون والصلاحيات</h2>
+          <h2 class="section-title">حسابات الموظفين والأدوار</h2>
           <div class="list-stack" id="usersList"></div>
         </div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="card">
+        <h2 class="section-title">سجل المرتجعات</h2>
+        <input id="returnsLogFilter" type="search" placeholder="بحث برقم الفاتورة أو الصنف أو المستخدم" style="width:100%;margin-bottom:12px;padding:10px;border-radius:10px;border:1px solid rgba(15,23,42,.15);" oninput="renderAdmin()" />
+        <div class="muted" id="returnsLogTotal" style="margin-bottom:10px;"></div>
+        <div class="list-stack" id="returnsLogList" style="max-height:480px;overflow:auto;"></div>
+      </section>
+
+      <div style="height: 18px;"></div>
+
+      <section class="card">
+        <h2 class="section-title">سجل حركات المخزون</h2>
+        <input id="invLogFilter" type="search" placeholder="بحث باسم الصنف أو المستخدم" style="width:100%;margin-bottom:12px;padding:10px;border-radius:10px;border:1px solid rgba(15,23,42,.15);" oninput="renderAdmin()" />
+        <div class="list-stack" id="inventoryLogList" style="max-height:480px;overflow:auto;"></div>
       </section>
 
       <div style="height: 18px;"></div>
@@ -475,10 +504,8 @@
       </section>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="shared-storage.js"></script>
+    <script src="access-api-config.js"></script>
+    <script src="access-api.js"></script>
     <script>
       const STORAGE_KEY = 'pharmacy_app_v1';
       const ADMIN_SESSION_KEY = 'pharmacy_admin_session';
@@ -534,10 +561,24 @@
 
       function saveState(state) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        if (window.pharmacyStorage && typeof window.pharmacyStorage.saveState === 'function') {
-          window.pharmacyStorage.saveState(state).catch(() => {});
+        if (window.pharmacyAccess && typeof window.pharmacyAccess.save === 'function') {
+          window.pharmacyAccess.save(state).catch(() => {});
         }
         renderAdmin();
+      }
+
+      let currentAdminName = sessionStorage.getItem('pharmacy_admin_name') || ADMIN_USERNAME;
+      const ROLE_LABELS = { admin: 'مدير', pharmacist: 'صيدلي', cashier: 'كاشير', storekeeper: 'أمين مخزن' };
+      const PERM_LABELS = { dashboard: 'لوحة التحكم', sales: 'المبيعات', purchases: 'المشتريات', products: 'الأصناف', suppliers: 'الموردين', reports: 'التقارير', expenses: 'المصروفات', admin: 'صفحة الإدارة' };
+      const ROLE_PRESETS = {
+        admin: ['dashboard', 'sales', 'purchases', 'products', 'suppliers', 'reports', 'expenses', 'admin'],
+        pharmacist: ['dashboard', 'sales', 'products'],
+        cashier: ['sales'],
+        storekeeper: ['purchases', 'products', 'suppliers']
+      };
+      const FIELD_LABELS = { name: 'الاسم', qty: 'الكمية', quantity: 'الكمية', price: 'سعر البيع', cost: 'التكلفة', expiry: 'الصلاحية', barcode: 'الباركود', supplier: 'المورد', type: 'النوع', notes: 'ملاحظات', strips: 'الشرائط', units: 'الوحدات' };
+      function escapeHtml(v) {
+        return String(v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
       }
 
       function addAdminAudit(state, action, details) {
@@ -546,7 +587,7 @@
           id: Date.now(),
           action,
           details,
-          username: ADMIN_USERNAME,
+          username: currentAdminName,
           date: new Date().toISOString()
         });
       }
@@ -656,11 +697,42 @@
         document.getElementById('usersList').innerHTML = users.length
           ? users.map(user => `
               <div class="list-item">
-                <strong>${user.username}</strong>
-                <div class="muted">الصلاحيات: ${(user.permissions || []).join('، ') || 'بدون صلاحيات'}</div>
+                <strong>${escapeHtml(user.username)}</strong> <span class="muted">— ${ROLE_LABELS[user.role] || 'موظف'}</span>
+                <div class="muted">الصلاحيات: ${(user.permissions || []).map(p => PERM_LABELS[p] || p).join('، ') || 'بدون صلاحيات'}</div>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <button type="button" class="action-btn" data-edit-user="${escapeHtml(user.username)}">تعديل</button>
+                  <button type="button" class="action-btn" style="background:#fee2e2;color:#991b1b;" data-delete-user="${escapeHtml(user.username)}">حذف</button>
+                </div>
               </div>
             `).join('')
           : '<div class="empty">لا يوجد مستخدمون</div>';
+
+        const retLog = Array.isArray(state.returns) ? state.returns : [];
+        const retFilter = (document.getElementById('returnsLogFilter')?.value || '').trim().toLowerCase();
+        const retRows = retLog.slice().reverse().filter(r => !retFilter || JSON.stringify(r).toLowerCase().includes(retFilter));
+        document.getElementById('returnsLogTotal').textContent = `عدد المرتجعات: ${retLog.length} — الإجمالي: ${retLog.reduce((a, r) => a + Number(r.total || 0), 0).toFixed(2)} ر.س`;
+        document.getElementById('returnsLogList').innerHTML = retRows.length
+          ? retRows.slice(0, 200).map(r => `
+              <div class="list-item">
+                <strong>↩️ مرتجع #${r.id} — فاتورة #${r.saleId} — ${Number(r.total || 0).toFixed(2)} ر.س</strong>
+                <div class="muted">العميل: ${escapeHtml(r.customer || '-')} — بواسطة: ${escapeHtml(r.username || '-')} — ${new Date(r.date).toLocaleString('ar-EG')}</div>
+                <div class="muted">الأصناف: ${(r.items || []).map(i => `${escapeHtml(i.name)} × ${i.qty} ${escapeHtml(i.unit || 'علبة')}`).join('، ')}</div>
+                <div class="muted">السبب: ${escapeHtml(r.reason || '-')}</div>
+              </div>`).join('')
+          : '<div class="empty">لا توجد مرتجعات بعد</div>';
+
+        const invLog = Array.isArray(state.inventoryLog) ? state.inventoryLog : [];
+        const invFilter = (document.getElementById('invLogFilter')?.value || '').trim().toLowerCase();
+        const invRows = invLog.slice().reverse().filter(e => !invFilter || JSON.stringify(e).toLowerCase().includes(invFilter)).slice(0, 200);
+        document.getElementById('inventoryLogList').innerHTML = invRows.length
+          ? invRows.map(e => `
+              <div class="list-item">
+                <strong>${e.action === 'add' ? '➕ إضافة' : e.action === 'delete' ? '🗑️ حذف' : '✏️ تعديل'}: ${escapeHtml(e.productName || '')}</strong>
+                <div class="muted">${escapeHtml(e.username || '-')} — ${new Date(e.date).toLocaleString('ar-EG')}</div>
+                ${(e.changes || []).map(c => `<div class="muted">${escapeHtml(FIELD_LABELS[c.field] || c.field)}: <s>${escapeHtml(String(c.before ?? '—'))}</s> ← <b>${escapeHtml(String(c.after ?? '—'))}</b></div>`).join('')}
+              </div>
+            `).join('')
+          : '<div class="empty">لا توجد حركات مخزون بعد</div>';
         document.getElementById('passwordUserSelect').innerHTML = users.map(user => `<option value="${user.username}">${user.username}</option>`).join('');
 
         const supplierSelect = document.getElementById('paymentSupplier');
@@ -795,49 +867,59 @@
           return;
         }
         if (!confirm('سيتم حذف كل المبيعات والمشتريات والأصناف والموردين والمستخدمين نهائيًا. هل تريد المتابعة؟')) return;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        saveState({
           cleared: true,
-          users: [{ username: 'admin', password: '1234', permissions: ['dashboard', 'sales', 'purchases', 'products', 'suppliers', 'reports', 'expenses'] }],
+          users: [{ username: 'admin', password: '1234', role: 'admin', permissions: ['dashboard', 'sales', 'purchases', 'products', 'suppliers', 'reports', 'expenses', 'admin'] }],
           products: [],
           suppliers: [],
           sales: [],
           purchases: [],
           supplierPayments: [],
           auditLog: [],
+          inventoryLog: [],
           shifts: [],
           nextProductId: 1,
           nextSaleId: 1,
           nextPurchaseId: 1,
           nextSupplierId: 1
-        }));
-        renderAdmin();
+        });
         showToast('تم تفريغ بيانات الموقعين نهائيًا');
       }
 
-      if (window.pharmacyStorage) {
-        window.pharmacyStorage.readRemoteState().then(remoteState => {
+      if (window.pharmacyAccess) {
+        window.pharmacyAccess.load().then(remoteState => {
           if (remoteState && typeof remoteState === 'object' && Object.keys(remoteState).length) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteState));
             renderAdmin();
           }
         }).catch(() => {});
 
-        window.pharmacyStorage.bindSync(remoteState => {
-          if (!remoteState || typeof remoteState !== 'object') return;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteState));
-          renderAdmin();
-        });
+        window.setInterval(() => {
+          const url = window.pharmacyAccess.getApiUrl();
+          if (!url) return;
+          window.pharmacyAccess.load().then(remoteState => {
+            if (remoteState && typeof remoteState === 'object' && JSON.stringify(remoteState) !== JSON.stringify(readState())) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteState));
+              renderAdmin();
+            }
+          }).catch(() => {});
+        }, 4000);
       }
 
       document.getElementById('adminLoginForm').addEventListener('submit', event => {
         event.preventDefault();
         const username = document.getElementById('adminUsername').value.trim();
         const password = document.getElementById('adminPassword').value;
-        if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-          document.getElementById('adminLoginError').textContent = 'بيانات مدير الإدارة غير صحيحة';
+        const isSuper = username === ADMIN_USERNAME && password === ADMIN_PASSWORD;
+        const staff = (readState().users || []).find(u => u.username === username && u.password === password);
+        const isStaffAdmin = staff && (staff.role === 'admin' || (staff.permissions || []).includes('admin'));
+        if (!isSuper && !isStaffAdmin) {
+          document.getElementById('adminLoginError').textContent = staff ? 'هذا الحساب ليس له صلاحية صفحة الإدارة' : 'بيانات الدخول غير صحيحة';
           return;
         }
+        currentAdminName = username;
         sessionStorage.setItem(ADMIN_SESSION_KEY, 'authenticated');
+        sessionStorage.setItem('pharmacy_admin_name', username);
         showAdminApp();
       });
 
@@ -893,16 +975,59 @@
         state.users = Array.isArray(state.users) ? state.users : [];
         const username = document.getElementById('newUsername').value.trim();
         const password = document.getElementById('newPassword').value;
-        const permissions = [...document.querySelectorAll('#userForm input[type="checkbox"]:checked')].map(input => input.value);
-        if (!username || !password || !permissions.length) return;
-        if (state.users.some(user => user.username.toLowerCase() === username.toLowerCase())) {
-          showToast('اسم المستخدم موجود بالفعل', 'error');
+        const role = document.getElementById('newUserRole').value;
+        let permissions = [...document.querySelectorAll('#userForm input[type="checkbox"]:checked')].map(input => input.value);
+        if (role === 'admin' && !permissions.includes('admin')) permissions.push('admin');
+        if (!username || password.length < 4 || !permissions.length) {
+          showToast('أدخل اسم مستخدم وكلمة مرور (4 أحرف على الأقل) وصلاحية واحدة', 'error');
           return;
         }
-        state.users.push({ username, password, permissions });
-        addAdminAudit(state, 'إضافة مستخدم', `تمت إضافة المستخدم: ${username}`);
+        const existing = state.users.find(user => user.username.toLowerCase() === username.toLowerCase());
+        if (existing) {
+          existing.password = password;
+          existing.role = role;
+          existing.permissions = permissions;
+          addAdminAudit(state, 'تعديل موظف', `تم تعديل حساب: ${username} (${ROLE_LABELS[role]})`);
+        } else {
+          state.users.push({ username, password, role, permissions });
+          addAdminAudit(state, 'إضافة موظف', `تمت إضافة الموظف: ${username} (${ROLE_LABELS[role]})`);
+        }
         saveState(state);
         event.target.reset();
+        showToast('تم حفظ حساب الموظف');
+      });
+
+      document.getElementById('newUserRole').addEventListener('change', event => {
+        const preset = ROLE_PRESETS[event.target.value] || [];
+        document.querySelectorAll('#userForm input[type="checkbox"]').forEach(input => {
+          input.checked = preset.includes(input.value);
+        });
+      });
+
+      document.getElementById('usersList').addEventListener('click', event => {
+        const del = event.target.closest('[data-delete-user]');
+        const edit = event.target.closest('[data-edit-user]');
+        const state = readState();
+        if (edit) {
+          const user = state.users.find(u => u.username === edit.dataset.editUser);
+          if (!user) return;
+          document.getElementById('newUsername').value = user.username;
+          document.getElementById('newUserRole').value = user.role || 'pharmacist';
+          document.querySelectorAll('#userForm input[type="checkbox"]').forEach(input => {
+            input.checked = (user.permissions || []).includes(input.value);
+          });
+          document.getElementById('newPassword').focus();
+          showToast('أدخل كلمة مرور ثم احفظ لتحديث الحساب');
+        }
+        if (del) {
+          const name = del.dataset.deleteUser;
+          if (state.users.length <= 1) { showToast('لا يمكن حذف آخر مستخدم', 'error'); return; }
+          if (!confirm(`حذف حساب ${name}؟`)) return;
+          state.users = state.users.filter(u => u.username !== name);
+          addAdminAudit(state, 'حذف موظف', `تم حذف حساب: ${name}`);
+          saveState(state);
+          showToast('تم حذف الحساب');
+        }
       });
 
       document.getElementById('paymentForm').addEventListener('submit', event => {
